@@ -62,13 +62,25 @@ class OpenAIRunner:
             return block_msg
 
         client = self._client()
+        request_options = {}
+        request_model = self.model
+        if self.provider == "openrouter":
+            if not request_model.endswith(":free"):
+                request_model = f"{request_model}:free"
+            request_options["extra_body"] = {
+                "provider": {
+                    "only": ["liquid/fp8"],
+                    "allow_fallbacks": False,
+                }
+            }
         completion = client.chat.completions.create(
-            model=self.model,
+            model=request_model,
             messages=[
                 {"role": "system", "content": agent.instruction},
                 {"role": "user", "content": user_message},
             ],
             temperature=self.temperature,
+            **request_options,
         )
         text = (completion.choices[0].message.content or "").strip()
 

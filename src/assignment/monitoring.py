@@ -42,7 +42,38 @@ class MonitoringAlert:
     judge_fails: int = 0
 
     def check_metrics(self) -> list[Alert]:
-        """TODO: compute rates, append Alert objects when thresholds exceeded."""
+        """Recompute threshold alerts from the current counters."""
+        snapshot = self.snapshot()
+        alerts = []
+        if snapshot["block_rate"] > self.block_rate_threshold:
+            alerts.append(
+                Alert(
+                    "block_rate",
+                    snapshot["block_rate"],
+                    self.block_rate_threshold,
+                    "Blocked request rate exceeded threshold.",
+                )
+            )
+        if self.rate_limit_hits > self.rate_limit_hit_threshold:
+            alerts.append(
+                Alert(
+                    "rate_limit_hits",
+                    float(self.rate_limit_hits),
+                    float(self.rate_limit_hit_threshold),
+                    "Rate-limit hits exceeded threshold.",
+                )
+            )
+        if snapshot["judge_fail_rate"] > self.judge_fail_rate_threshold:
+            alerts.append(
+                Alert(
+                    "judge_fail_rate",
+                    snapshot["judge_fail_rate"],
+                    self.judge_fail_rate_threshold,
+                    "Safety judge failure rate exceeded threshold.",
+                )
+            )
+        self.alerts = alerts
+        return alerts
         raise NotImplementedError("Implement MonitoringAlert.check_metrics")
 
     def export_json(self, filepath: str | None = None):
@@ -50,8 +81,13 @@ class MonitoringAlert:
         Use ``filepath or default_metrics_path()`` so running from ``src/`` does not
         create ``src/outputs/``.
         """
-        _ = filepath or default_metrics_path()
-        raise NotImplementedError("Implement MonitoringAlert.export_json")
+        path = Path(filepath or default_metrics_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(self.snapshot(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return str(path)
 
     def snapshot(self) -> dict:
         block_rate = (
